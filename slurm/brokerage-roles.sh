@@ -20,6 +20,6 @@ BASE="/N/slate/gpanayio/scisci-roles"
 
 echo "===== Brokerage role analysis started at $(date) ====="
 
-python -u brokerage_roles.py
+python -u find_roles.py
 
 echo "===== Brokerage role analysis finished at $(date) ====="
