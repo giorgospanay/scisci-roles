@@ -11,7 +11,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=256G
-#SBATCH --time=0-18:00:00
+#SBATCH --time=0-12:00:00
 #SBATCH -A r00272
 
 module load python/3.12.4
@@ -20,6 +20,6 @@ BASE="/N/slate/gpanayio/scisci-roles"
 
 echo "===== Brokerage role analysis started at $(date) ====="
 
-python -u find_roles.py
+python -u brokerage_roles.py
 
 echo "===== Brokerage role analysis finished at $(date) ====="
