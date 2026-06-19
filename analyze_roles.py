@@ -24,7 +24,7 @@ from collections import Counter
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 
-INPUT_FILE  = sys.argv[1] if len(sys.argv) > 1 else "brokerage_roles.csv"
+INPUT_FILE  = sys.argv[1] if len(sys.argv) > 1 else "obj/brokerage_roles.csv"
 FIGURE_DIR  = "figures"
 
 ROLE_ORDER  = ["coordinator", "gatekeeper", "representative", "liaison", "unassigned"]
@@ -36,7 +36,7 @@ ROLE_COLORS = {
     "unassigned":    "#cccccc",
 }
 
-DISC_ORDER = ["CS", "Biology", "Math", "Physics"]
+DISC_ORDER = ["CS", "Biology", "Math", "Physics", "Sociology", "Economics", "Linguistics"]
 
 # ── LOAD & CLEAN ──────────────────────────────────────────────────────────────
 
@@ -171,8 +171,15 @@ def fig2_roles_by_discipline(df):
 
     ax.set_ylabel("% of authors")
     ax.set_title("Role distribution by primary discipline", fontweight="bold", pad=12)
-    ax.set_ylim(0, 108)
-    ax.legend(loc="upper right", framealpha=0.9, fontsize=9)
+    ax.set_ylim(0, 115)
+    fig.subplots_adjust(top=0.78)
+    fig.legend(
+        [plt.Rectangle((0,0),1,1,color=ROLE_COLORS[r]) for r in roles],
+        [r.capitalize() for r in roles],
+        loc="upper center", ncol=4,
+        bbox_to_anchor=(0.5, 0.97),
+        framealpha=0.9, fontsize=9
+    )
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:.0f}%"))
     fig.tight_layout()
     return fig
@@ -206,8 +213,8 @@ def fig3_blau_distributions(df):
     return fig
 
 def fig4_discipline_combinations(df):
-    """How many authors appear in 1, 2, 3 disciplines — split by role."""
-    assigned = df[df["role"] != "unassigned"]
+    """Discipline span by role — single-discipline authors excluded."""
+    assigned = df[(df["role"] != "unassigned") & (df["n_disciplines"] > 1)]
     roles    = [r for r in ROLE_ORDER if r != "unassigned"]
     n_discs  = sorted(assigned["n_disciplines"].unique())
 
@@ -226,8 +233,15 @@ def fig4_discipline_combinations(df):
     ax.set_xticklabels([f"{n} discipline{'s' if n>1 else ''}" for n in n_discs])
     ax.set_ylabel("% of all assigned authors")
     ax.set_title("Discipline span by role", fontweight="bold", pad=12)
-    ax.legend(fontsize=9, framealpha=0.9)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:.1f}%"))
+    fig.subplots_adjust(top=0.78)
+    fig.legend(
+        [plt.Rectangle((0,0),1,1,color=ROLE_COLORS[r]) for r in roles],
+        [r.capitalize() for r in roles],
+        loc="upper center", ncol=4,
+        bbox_to_anchor=(0.5, 0.97),
+        framealpha=0.9, fontsize=9
+    )
     fig.tight_layout()
     return fig
 

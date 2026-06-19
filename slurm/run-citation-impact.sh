@@ -10,7 +10,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=256G
-#SBATCH --time=1-00:00:00
+#SBATCH --time=1-12:00:00
 #SBATCH -A r00272
 #SBATCH --chdir=/N/slate/gpanayio/scisci-roles
 
