@@ -32,7 +32,7 @@ BASE_DIR     = "/N/slate/gpanayio/scisci-roles"
 EDGELIST_DIR = "/N/slate/gpanayio/scisci-gatekeepers/obj"
 OUTPUT_DIR   = os.path.join(BASE_DIR, "obj")
 
-DISCIPLINES = ["CS", "Biology", "Math", "Physics", "Sociology", "Economics", "Linguistics"]
+DISCIPLINES = ["CS", "Biology", "Math", "Physics", "Sociology", "Economics"]  # Linguistics excluded — layers not ready yet
 
 SIMILARITY_AVAILABLE = {
 	"CS":          True,
@@ -41,7 +41,6 @@ SIMILARITY_AVAILABLE = {
 	"Physics":     True,
 	"Sociology":   True,
 	"Economics":   True,
-	"Linguistics": True,
 }
 
 MIN_COLLABORATORS = 5   # minimum distinct neighbors in collab layer
