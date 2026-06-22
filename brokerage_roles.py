@@ -32,12 +32,15 @@ BASE_DIR     = "/N/slate/gpanayio/scisci-roles"
 EDGELIST_DIR = "/N/slate/gpanayio/scisci-gatekeepers/obj"
 OUTPUT_DIR   = os.path.join(BASE_DIR, "obj")
 
-DISCIPLINES = ["CS", "Biology", "Math"]  # add "Physics" once layers are ready
+DISCIPLINES = ["CS", "Biology", "Math", "Physics", "Sociology", "Economics"]  # Linguistics excluded — layers not ready yet
 
 SIMILARITY_AVAILABLE = {
-    "CS":      True,
-    "Biology": True,
-    "Math":    True,
+    "CS":        True,
+    "Biology":   True,
+    "Math":      True,
+    "Physics":   True,
+    "Sociology": True,
+    "Economics": True,
 }
 
 MIN_COLLABORATORS = 5   # minimum distinct neighbors in collab layer
@@ -254,11 +257,39 @@ def summarize(df):
         print(cross.groupby("primary_discipline")["role"].value_counts().to_string())
 
 
+def check_files_exist():
+    """Verify all expected edgelist files exist before doing any heavy work."""
+    log("Checking that all expected edgelist files exist...")
+    missing = []
+    for disc in DISCIPLINES:
+        collab_path = os.path.join(EDGELIST_DIR, f"filtered_collaboration_layer_{disc}.edgelist")
+        if not os.path.exists(collab_path):
+            missing.append(collab_path)
+
+        if SIMILARITY_AVAILABLE.get(disc, False):
+            sim_path = os.path.join(EDGELIST_DIR, f"filtered_author_similarity_layer_{disc}.edgelist")
+            if not os.path.exists(sim_path):
+                missing.append(sim_path)
+
+    if missing:
+        log("  Missing files:")
+        for m in missing:
+            log(f"    {m}")
+        raise FileNotFoundError(
+            f"{len(missing)} expected edgelist file(s) not found. "
+            "Either wait for the pipeline to finish, or set SIMILARITY_AVAILABLE[disc] = False "
+            "for disciplines whose similarity layer isn't ready yet."
+        )
+    log("  All expected files present.")
+
+
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 
 def main():
     t0 = time.time()
     log("=== Brokerage role analysis starting ===")
+
+    check_files_exist()
 
     # Load and immediately reduce each edgelist — never hold >1 full edgelist
     collab_counts = build_neighbor_counts("collab", MIN_COLLABORATORS)
