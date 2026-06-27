@@ -67,30 +67,45 @@ def blau_from_counts(group):
     return float(1 - (p ** 2).sum())
 
 
-def load_edgelist(path, sep):
-    log(f"  Reading {os.path.basename(path)}...")
-    df = pd.read_csv(
+def stream_edgelist_to_neighbor_counts(path, sep, disc, chunksize=5_000_000):
+    """
+    Stream a (potentially huge) edgelist in chunks and accumulate it directly
+    into a compact (author, neighbor_disc, count) table, without ever holding
+    the full edgelist — or even one full chunk's src+dst doubled copy — in
+    memory at the same time as the running total.
+
+    This replaces the old load-everything-then-reduce approach, which could
+    OOM on large similarity layers (e.g. Physics: 150M+ edges).
+    """
+    log(f"  Streaming {os.path.basename(path)}...")
+    running = None  # accumulating (author, neighbor_disc) -> count, as a Series
+    n_edges = 0
+
+    for chunk in pd.read_csv(
         path, sep=sep, header=None,
         names=["src", "dst", "weight"],
         dtype={"src": str, "dst": str, "weight": float},
-    )
-    log(f"  Done — {len(df):,} edges")
-    return df
+        chunksize=chunksize,
+    ):
+        n_edges += len(chunk)
+        both = pd.concat([chunk["src"], chunk["dst"]], ignore_index=True)
+        chunk_counts = both.value_counts()
+        del both, chunk
+        if running is None:
+            running = chunk_counts
+        else:
+            running = running.add(chunk_counts, fill_value=0)
+        del chunk_counts
 
+    log(f"  Done — {n_edges:,} edges streamed")
 
-def edgelist_to_neighbor_counts(df, disc):
-    """
-    Reduce a full edgelist to a compact table:
-        author | neighbor_disc | count
-    where count = number of edges to neighbors in that discipline.
-    Frees the edgelist immediately after reduction.
-    """
-    src = df[["src"]].rename(columns={"src": "author"})
-    dst = df[["dst"]].rename(columns={"dst": "author"})
-    both = pd.concat([src, dst], ignore_index=True)
-    both["neighbor_disc"] = disc
-    counts = both.groupby(["author", "neighbor_disc"]).size().reset_index(name="count")
-    return counts
+    if running is None:
+        return pd.DataFrame(columns=["author", "neighbor_disc", "count"])
+
+    counts = running.rename("count").rename_axis("author").reset_index()
+    counts["neighbor_disc"] = disc
+    counts["count"] = counts["count"].astype("int64")
+    return counts[["author", "neighbor_disc", "count"]]
 
 
 # ── BUILD NEIGHBOR COUNTS (one discipline at a time) ─────────────────────────
@@ -116,16 +131,10 @@ def build_neighbor_counts(layer_type, min_neighbors):
             sep  = " "
 
         log(f"  Loading {disc}...")
-        df = load_edgelist(path, sep)
-
-        log(f"  Reducing to neighbor counts...")
-        counts = edgelist_to_neighbor_counts(df, disc)
+        counts = stream_edgelist_to_neighbor_counts(path, sep, disc)
         log(f"  {disc}: {len(counts):,} author-discipline pairs")
 
         parts.append(counts)
-
-        # Free the full edgelist immediately
-        del df
         gc.collect()
 
     log("  Concatenating all disciplines...")
