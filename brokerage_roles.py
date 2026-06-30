@@ -31,6 +31,7 @@ import numpy as np
 BASE_DIR     = "/N/slate/gpanayio/scisci-roles"
 EDGELIST_DIR = "/N/slate/gpanayio/scisci-gatekeepers/obj"
 OUTPUT_DIR   = os.path.join(BASE_DIR, "obj")
+SCRATCH_DIR  = "/N/scratch/gpanayio/scisci-roles-counts"  # cached per-disc neighbor counts
 
 DISCIPLINES = ["CS", "Biology", "Math", "Physics", "Sociology", "Economics"]  # Linguistics excluded — layers not ready yet
 
@@ -113,9 +114,12 @@ def stream_edgelist_to_neighbor_counts(path, sep, disc, chunksize=5_000_000):
 def build_neighbor_counts(layer_type, min_neighbors):
     """
     Load each discipline edgelist, reduce to (author, disc, count), free edgelist.
+    Caches the compact per-discipline count tables to SCRATCH_DIR as parquet
+    files so reruns skip the expensive streaming step entirely.
     Returns a single stacked counts table across all disciplines.
     """
     log(f"Building neighbor counts for {layer_type} layer...")
+    os.makedirs(SCRATCH_DIR, exist_ok=True)
     parts = []
 
     for disc in DISCIPLINES:
@@ -123,16 +127,26 @@ def build_neighbor_counts(layer_type, min_neighbors):
             log(f"  Skipping {disc} (similarity unavailable)")
             continue
 
-        if layer_type == "collab":
-            path = os.path.join(EDGELIST_DIR, f"filtered_collaboration_layer_{disc}.edgelist")
-            sep  = "\t"
-        else:
-            path = os.path.join(EDGELIST_DIR, f"filtered_author_similarity_layer_{disc}.edgelist")
-            sep  = " "
+        cache_path = os.path.join(SCRATCH_DIR, f"counts_{layer_type}_{disc}.parquet")
 
-        log(f"  Loading {disc}...")
-        counts = stream_edgelist_to_neighbor_counts(path, sep, disc)
-        log(f"  {disc}: {len(counts):,} author-discipline pairs")
+        if os.path.exists(cache_path):
+            log(f"  {disc}: loading cached counts from {cache_path}")
+            counts = pd.read_parquet(cache_path)
+            log(f"  {disc}: {len(counts):,} author-discipline pairs (from cache)")
+        else:
+            if layer_type == "collab":
+                path = os.path.join(EDGELIST_DIR, f"filtered_collaboration_layer_{disc}.edgelist")
+                sep  = "\t"
+            else:
+                path = os.path.join(EDGELIST_DIR, f"filtered_author_similarity_layer_{disc}.edgelist")
+                sep  = " "
+
+            log(f"  {disc}: streaming from {os.path.basename(path)}...")
+            counts = stream_edgelist_to_neighbor_counts(path, sep, disc)
+            log(f"  {disc}: {len(counts):,} author-discipline pairs")
+
+            counts.to_parquet(cache_path, index=False)
+            log(f"  {disc}: counts cached to {cache_path}")
 
         parts.append(counts)
         gc.collect()
@@ -186,7 +200,7 @@ def compute_blau(counts, layer_name):
     log(f"Computing Blau indices for {layer_name} layer...")
     blau = (
         counts.groupby("author")
-        .apply(blau_from_counts)
+        .apply(blau_from_counts, include_groups=False)
         .rename(f"blau_{layer_name}")
     )
     log(f"  Done — {len(blau):,} authors scored")
